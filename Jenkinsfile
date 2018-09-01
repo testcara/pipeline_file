@@ -1,13 +1,17 @@
 pipeline {
-    agent any
+    agent any 
     stages {
-        stage('Run Tests') {
+        stage('Do RC Testing') {
             parallel {
-                stage('Do E2E Testing') {
-                build job: 'E2E_Testing'
-                }
-                stage('Do Perf Testing') {
-                build job: 'Perf_Testing'
+                stage('Run E2E Testing') {
+                    steps {
+                        build(job:"E2E_Testing")
+                    }
+                    }
+                stage('Run Perf Testing') {
+                    steps {
+                        build(job:"Perf_Testing")
+                    }
                 }
             }
         }
