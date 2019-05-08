@@ -1,0 +1,229 @@
+{
+	"apiVersion": "v1",
+	"kind": "Template",
+	"metadata": {
+		"name": "errata-mysql-template"
+	},
+	"objects": [
+		{
+			"apiVersion": "v1",
+			"kind": "ImageStream",
+			"metadata": {
+				"name": "${APP_NAME}",
+				"namespace": "${NAMESAPCE}",
+				"labels": {
+					"app": "${APP_NAME}"
+				}
+			},
+			"spec": {
+				"tags": [
+					{
+						"from": {
+							"kind": "DockerImage",
+							"name": "${APP_NAME}"
+						}
+					}
+				]
+			}
+		},
+		{
+			"apiVersion": "v1",
+			"kind": "BuildConfig",
+			"metadata": {
+				"name": "${APP_NAME}",
+				"namespace": "${NAMESAPCE}",
+				"labels": {
+					"app": "${APP_NAME}"
+				}
+			},
+			"spec": {
+				"output": {
+					"to": {
+						"kind": "ImageStreamTag",
+						"name": "${APP_NAME}:latest"
+					}
+				},
+				"source": {
+					"contextDir": "${DOCKER_CONTEXT}",
+					"git": {
+						"ref": "${UPSHIFT_ET_BRANCH}",
+						"uri": "${UPSHIFT_ET_REPO}"
+					},
+					"type": "Git"
+				},
+				"strategy": {
+					"type": "Docker",
+					"dockerStrategy": {
+						"dockerfilePath": "Dockerfile",
+						"env": [
+							{
+								"name": "GIT_SSL_NO_VERIFY",
+								"value": "true"
+							},
+							{
+								"name": "MYSQL_ROOT_PASSWORD",
+								"valueFrom": {
+									"secretKeyRef": {
+										"key": "database-root-password",
+										"name": "${MYSQL_SECRET}"
+									}
+								}
+							},
+							{
+								"name": "MYSQL_DATABASE",
+								"valueFrom": {
+									"secretKeyRef": {
+										"key": "database-name",
+										"name": "${MYSQL_SECRET}"
+									}
+								}
+							},
+							{
+								"name": "MYSQL_USER",
+								"valueFrom": {
+									"secretKeyRef": {
+										"key": "database-user",
+										"name": "${MYSQL_SECRET}"
+									}
+								}
+							},
+							{
+								"name": "MYSQL_PASSWORD",
+								"valueFrom": {
+									"secretKeyRef": {
+										"key": "database-password",
+										"name": "${MYSQL_SECRET}"
+									}
+								}
+							}
+						]
+					}
+				}
+			}
+		},
+		{
+			"apiVersion": "v1",
+			"kind": "DeploymentConfig",
+			"metadata": {
+				"labels": {
+					"app": "${APP_NAME}"
+				},
+				"name": "${APP_NAME}",
+				"namespace": "${NAMESAPCE}"
+			},
+			"spec": {
+				"replicas": 1,
+				"selector": {
+					"app": "${APP_NAME}",
+					"deploymentconfig": "${APP_NAME}"
+				},
+				"template": {
+					"metadata": {
+						"labels": {
+							"app": "${APP_NAME}",
+							"deploymentconfig": "${APP_NAME}"
+						}
+					},
+					"spec": {
+						"containers": [
+							{
+								"env": [
+									{
+										"name": "MYSQL_ROOT_PASSWORD",
+										"valueFrom": {
+											"secretKeyRef": {
+												"key": "database-root-password",
+												"name": "${MYSQL_SECRET}"
+											}
+										}
+									}
+								],
+								"image": "${NAMESAPCE}/${APP_NAME}:latest",
+								"imagePullPolicy": "Always",
+								"name": "${APP_NAME}",
+								"ports": [
+									{
+										"containerPort": 3306,
+										"protocol": "TCP"
+									}
+								]
+							}
+						]
+					}
+				},
+				"triggers": [
+					{
+						"imageChangeParams": {
+							"automatic": true,
+							"containerNames": [
+								"${APP_NAME}"
+							],
+							"from": {
+								"kind": "ImageStreamTag",
+								"name": "${APP_NAME}:latest",
+								"namespace": "${NAMESAPCE}"
+							}
+						},
+						"type": "ImageChange"
+					},
+					{
+						"type": "ConfigChange"
+					}
+				]
+			}
+		},
+		{
+			"apiVersion": "v1",
+			"kind": "Service",
+			"metadata": {
+				"labels": {
+					"app": "${APP_NAME}"
+				},
+				"name": "${APP_NAME}",
+				"namespace": "${NAMESAPCE}"
+			},
+			"spec": {
+				"ports": [
+					{
+						"name": "3306-tcp",
+						"port": 3306,
+						"protocol": "TCP",
+						"targetPort": 3306
+					}
+				],
+				"selector": {
+					"app": "${APP_NAME}",
+					"deploymentconfig": "${APP_NAME}"
+				},
+				"sessionAffinity": "None",
+				"type": "ClusterIP"
+			}
+		}
+	],
+	"parameters": [
+		{
+			"name": "APP_NAME",
+			"value": "errata-rails-mysql"
+		},
+		{
+			"name": "UPSHIFT_ET_REPO",
+			"value": "https://gitlab.cee.redhat.com/wlin/errata-upshift.git"
+		},
+		{
+			"name": "UPSHIFT_ET_BRANCH",
+			"value": "master"
+		},
+		{
+			"name": "DOCKER_CONTEXT",
+			"value": "images/mysql"
+		},
+		{
+			"name": "MYSQL_SECRET",
+			"value": "et-qe-testing-mysql"
+		},
+		{
+			"name": "NAMESAPCE",
+			"value": "errata-qe-test"
+		}
+	]
+}
