@@ -154,7 +154,7 @@
 				"triggers": [
 					{
 						"imageChangeParams": {
-							"automatic": true,
+							"automatic": false,
 							"containerNames": [
 								"${APP_NAME}"
 							],
