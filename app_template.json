@@ -272,7 +272,7 @@
 				"name": "${APP_NAME}-route"
 			},
 			"spec": {
-				"host": "${APP_NAME}.cloud.paas.upshift.redhat.com",
+				"host": "${APP_NAME}.${CLOUD_NAME}",
 				"tls": {
 					"insecureEdgeTerminationPolicy": "Allow",
 					"termination": "edge"
@@ -390,6 +390,10 @@
 		{
 			"name": "ET_S2I_IMAGE",
 			"value": "docker-registry.upshift.redhat.com/errata-qe-test/errata-s2i-httpd:latest"
+		},
+		{
+			"name": "CLOUD_NAME",
+			"value": "cloud.paas.psi.redhat.com"
 		}
 	]
 }
