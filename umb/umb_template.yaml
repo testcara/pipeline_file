@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Template
+metadata: {name: umb-broker-template}
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}
+    namespace: ${NAMESPACE}
+  spec:
+    ports:
+    - {name: 5672-tcp, port: 5672, protocol: TCP, targetPort: 5672}
+    - {name: 8161-tcp, port: 8161, protocol: TCP, targetPort: 8161}
+    selector: {app: '${APP_NAME}', deploymentconfig: '${APP_NAME}'}
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}
+    namespace: ${NAMESPACE}
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector: {app: '${APP_NAME}', deploymentconfig: '${APP_NAME}'}
+    strategy: {type: Rolling}
+    template:
+      metadata:
+        labels: {app: '${APP_NAME}', deploymentconfig: '${APP_NAME}'}
+      spec:
+        containers:
+        - image: ${NAMESPACE}/${APP_NAME}:${TAG}
+          imagePullPolicy: IfNotPresent
+          name: ${APP_NAME}
+          ports:
+          - {containerPort: 5672, protocol: TCP}
+          - {containerPort: 8161, protocol: TCP}
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+    test: false
+    triggers:
+    - {type: ConfigChange}
+    - imageChangeParams:
+        automatic: true
+        containerNames: ['${APP_NAME}']
+        from: {kind: ImageStreamTag, name: '${APP_NAME}:${TAG}', namespace: '${NAMESPACE}'}
+      type: ImageChange
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}
+    namespace: ${NAMESPACE}
+  spec:
+    tags:
+    - from: {kind: DockerImage, name: '${UMB_BROKER_IMG}'}
+      name: ${TAG}
+- apiVersion: v1
+  kind: Route
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}
+    namespace: ${NAMESPACE}
+  spec:
+    host: et-${APP_NAME}.cloud.paas.psi.redhat.com
+    port: {targetPort: 8161-tcp}
+    to: {kind: Service, name: '${APP_NAME}', weight: 100}
+parameters:
+- {name: APP_NAME, value: umb-qe}
+- {name: NAMESPACE, value: errata-qe-test}
+- {name: UMB_BROKER_IMG, value: "docker-registry.engineering.redhat.com/carawang-ci-testing-stub/ci_umb_broker:v1"}
+- {name: TAG, value: 'v1'}
