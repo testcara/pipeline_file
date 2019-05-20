@@ -1,0 +1,434 @@
+def templateNameofET = 'errata-rails-aio-template'
+def templateNameofMysql = 'errata-mysql-template'
+//def templatePathofET = 'https://gitlab.cee.redhat.com/wlin/errata-upshift/raw/master/upshift/template/errata_services_template/errata-all-services-in-one-pod.yaml'
+// def templatePathofMysql = 'https://gitlab.cee.redhat.com/wlin/errata-upshift/raw/master/upshift/template/mysql/mysql_template.yaml'
+def templatePathofET = 'https://github.com/testcara/pipeline_file/raw/master/app_template.json'
+def templatePathofMysql = 'https://github.com/testcara/pipeline_file/raw/master/mysql_template.json'
+def RUN_USER = '1058980001'
+def etTemplateParameters = "-p=CPU_LIMITS=1 -p=MEM_REQUEST=4Gi -p=MEM_LIMITS=4Gi -p=ET_CONFIGMAP=et-qe-testing-settings -p=ET_SECRET=et-qe-testing-settings -p=ET_MYSQL_SECRET=et-qe-testing-mysql -p=RUN_USER=$RUN_USER"
+
+
+def process_template_and_create_objects(String templateName, String templateParameters, String[] objectsName) {
+    echo "testing---"
+    echo "$templateName"
+    def templateGeneratedSelector = openshift.selector(objectsName)
+    def objectModels = openshift.process(templateName, templateParameters)
+    def objects
+    def verb
+    def objectsGeneratedFromTemplate = templateGeneratedSelector.exists()
+    if (!objectsGeneratedFromTemplate) {
+        verb = "Created"
+        objects = openshift.create(objectModels)
+    } else {
+        verb = "Found"
+        objects = templateGeneratedSelector
+    }
+    objects.withEach {
+        echo "${verb} ${it.name()} from template with labels ${it.object().metadata.labels}"
+    }
+    return objects
+}
+
+def check_builds(Integer time, String bcName) {
+    def goodBuildStatus = (String[]) ['Running', 'Pending', 'Complete']
+    def bcSelector = openshift.selector("bc", bcName)
+    bcSelector.startBuild()
+    def builds= bcSelector.related('builds')
+    timeout(time) { 
+        // Checking watch output and running watch closure again in 250ms
+        builds.untilEach(1) {
+            def status = it.object().status.phase
+            if ( goodBuildStatus.contains(status) == false ) {
+                throw new Exception("Build failed")
+            } //if
+            if ( status == 'Complete' )
+            {
+                echo "---> Build Complete ..."
+                return true
+            } //if
+        } //each
+    } //timeout
+}
+
+def check_deployments(Integer time, String dcName) {
+    def goodBuildStatus = (String[]) ['Running', 'Pending', 'Complete']
+    def dcSelector = openshift.selector("dc", dcName)
+    dcSelector.rollout().latest()
+    timeout(time) { 
+        openshift.selector("dc", dcName).related('pods').untilEach(1) {
+            if (it.object().status.phase == "Running" )
+            {
+                echo "---> Deploy Complete ..."
+                return true
+            }
+        } //each
+    } // timout
+}
+
+def all_stages(String templateNameofMysql, String templateNameofET, String etTemplateParameters, String appName){
+    stage('create Mysql app') {
+        container('qe-testing-runner') {
+            script {
+                openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                    openshift.withProject('errata-qe-test'){
+                        echo '--- Create Mysql app ${appName}-mysql from the ET Mysql template --->'
+                        def MYSQL_APP_NAME = "${appName}-mysql"
+                        def mysqlTemplateParameters = "-p=APP_NAME=${MYSQL_APP_NAME}"
+                        def mysqlObjects = (String[]) ["is/${MYSQL_APP_NAME}", "bc/${MYSQL_APP_NAME}", "dc/${MYSQL_APP_NAME}", "svc/${MYSQL_APP_NAME}"]
+                        process_template_and_create_objects(templateNameofMysql, mysqlTemplateParameters, mysqlObjects)
+                    } //project
+                } //cluster
+            } //script
+        } //container
+    } // stage
+    stage('build Mysql app') {
+        container('qe-testing-runner') {
+            script {
+                openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                    openshift.withProject('errata-qe-test'){
+                        echo '--- Build Mysql app: ${appName}-mysql --->'
+                        check_builds(20, "${appName}-mysql")
+                    } //project
+                } //cluster
+            } //script
+        } //container
+    } // stage
+    stage('deploy Mysql app') {
+        container('qe-testing-runner') {
+            script {
+                openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                    openshift.withProject('errata-qe-test'){
+                        echo '--- Deploy Mysql app: ${appName}-mysql --->'
+                        check_deployments(2, "${appName}-mysql")
+                    } //project
+                } //cluster
+            } //script
+        } //container
+    } // stage
+    stage('create ET app') {
+        container('qe-testing-runner') {
+            script {
+                openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                    openshift.withProject('errata-qe-test'){
+                        echo '--- Create ET apps from the ET template --->'
+                        etTemplateParameters = "-p=APP_NAME=${appName} ${etTemplateParameters}"
+                        def etObjects = (String[]) ["is/${appName}-s2i", "is/${appName}-basic", "bc/${appName}-bc", "dc/${appName}-rails", "route/${appName}-route", "svc/${appName}-svc"]
+                        process_template_and_create_objects(templateNameofET, etTemplateParameters, etObjects)
+                    } //project
+                } //cluster
+            } //script
+        } //container
+    } //stage
+    stage('build ET app') {
+        container('qe-testing-runner') {
+            script {
+                openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                    openshift.withProject('errata-qe-test'){
+                        echo '--- Build ET app  --->'
+                        check_builds(20, "${appName}-bc")
+                    } //project
+                } //cluster
+            } //script
+        } //container
+    } // stage
+    stage('deploy ET app') {
+        container('qe-testing-runner') {
+            script {
+                openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                    openshift.withProject('errata-qe-test'){
+                        echo '--- Deploy ET app --->'
+                        check_deployments(2, "${appName}-rails")
+                    } //project
+                } //cluster
+            } //script
+        }// container
+    } //stage
+    stage('load db and do TS2 test'){
+        container("qe-testing-runner") {
+            script{
+                openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                    openshift.withProject('errata-qe-test'){
+                        sh '''
+                        import_db(){
+                            oc exec ${1} -i -- mysql -uroot -parNdk123_ -Derrata < /tmp/TS2_db/errata.latest.sql
+                        }
+                        rake_migration(){
+                            oc exec ${1} -i -- bundle exec rake db:migrate
+                        }
+                        update_setting_to_disable_qpid() {
+                            config_file="/opt/app-root/src/config/initializers/settings.rb"
+                            oc exec ${1} -- sed -i "s/:messages_to_qpid_enabled => true/:messages_to_qpid_enabled => false/g" ${config_file}
+                        }
+                        restart_services() {
+                            oc exec ${1} -- /etc/init.d/httpd24-httpd restart
+                            oc exec ${1} -- /etc/init.d/delayed_job restart
+                            oc exec ${1} -- /etc/init.d/messaging_service restart
+                        }
+                        reset_testing_host(){
+                            sed -i "s/et-system-test-qe-01.usersys.redhat.com/${1}.cloud.paas.psi.redhat.com/g" ${2}/features/remote/config/env.yml
+                        }
+                        specify_et_umb_for_cucumber_umb_cases(){
+                            umb_config_1='/opt/app-root/src/config/initializers/credentials/message_bus.rb'
+                            umb_config_2='/opt/app-root/src/examples/ruby/message_bus/umb_configuration.rb'
+                            et_pod=$(sed -n '1 p' et_pod_names)
+                            for umb_config in $umb_config_1 $umb_config_2
+                            do
+                                oc exec ${et_pod} -i -- sed -i "s/ENV\\['ET_UMB_BROKER_URL_1'\\]/'amqp:\\/\\/cucumber-umb-qe:5672'/g" ${umb_config}
+                                oc exec ${et_pod} -i -- sed -i "s/ENV\\['ET_UMB_BROKER_URL_2'\\]/'amqp:\\/\\/cucumber-umb-qe:5672'/g" ${umb_config}
+
+                            done
+                            restart_services ${et_pod}
+                        }
+                        specify_runner_umb_for_cucumber_umb_cases(){
+                            umb_config_1='TS2_testing_group_1/features/remote/support/umb.rb'
+                            sed -i "s/umb-qe/cucumber-umb-qe/g" $umb_config_1
+                        }
+                        collect_pods_info(){
+                            if [ ! -f et_pod_names ]
+                            then
+                              oc get pods | grep "cucumber" | grep "rails" | grep Running | grep -v build | grep -v deploy | awk '{print $1}'| tail -n3 > et_pod_names
+                            fi
+                            if [ ! -f mysql_pod_names ]
+                            then
+                              oc get pods | grep "cucumber" | grep "mysql" | grep Running | grep -v build | grep -v deploy | awk '{print $1}'| tail -n3 > mysql_pod_names
+                            fi
+                        }
+                        write_tags(){
+                            if [ ! -f tags_name ]
+                            then
+                              echo -e "-t @umb,@examples\n-t @mx,@module\n-t ~@disable -t ~@real_e2e --tags ~@pdc -t ~@mx -t ~@module -t ~@umb -t ~@examples" > tag_groups
+                            fi
+                        }
+                        prepare_umb_for_first_group(){
+                            if [ ! -f set_umb_1 ]
+                            then
+                                touch set_umb_1
+                                specify_et_umb_for_cucumber_umb_cases
+                                specify_runner_umb_for_cucumber_umb_cases
+                            fi
+                        }
+                        run_import_sql_to_db(){
+                            echo "---> Import database ..."
+                            cat mysql_pod_names | while read mysql_pod
+                            do
+                              if [ ! -f $mysql_pod ]
+                              then
+                                touch $mysql_pod
+                                import_db $mysql_pod
+                                break
+                              fi
+                            done
+                        }
+                        run_migration_and_disable_sending_qpid_msg(){
+                            echo "---> DB migraion and disable to send qpid message ..."
+                            cat et_pod_names | while read et_pod
+                            do
+                              if [ ! -f $et_pod ]
+                              then
+                                touch $et_pod
+                                rake_migration $et_pod
+                                update_setting_to_disable_qpid $et_pod
+                                restart_services $et_pod
+                                break
+                              fi
+                            done
+                        }
+                        write_test_scripts_and_do_testing(){
+                            for group_num in 1 2 3
+                            do
+                                if [ ! -f cucumber_${group_num}.sh ]
+                                then
+                                    cd TS2_testing_group_${group_num}
+                                    bundle install --path=/opt/rh/rh-ruby22/root/usr/local/bin
+                                    cd -
+
+                                    pod=$(sed -n "${group_num} p" et_pod_names)
+                                    app_name=$(echo $pod | cut -d '-' -f 1-3)
+                                    tags=$(sed -n "${group_num} p" tag_groups)
+
+                                    reset_testing_host ${app_name} TS2_testing_group_${group_num}
+                                    sed -i "s/admin1@hsstest.com/qgong@redhat.com/g" TS2_testing_group_${group_num}/features/remote/config/env.yml
+                                    
+                                    cucumber_command="ET_POD=${pod} RUN_ON_PSI=True TEST_ENV=qe_01 BZ_ADMIN_PASSWD=1HSSQE@redhat bundle exec cucumber -p remote"
+                                    echo ${cucumber_command} ${tags} --format json_pretty --strict -o cucumber-report-${group_num}.json TS2_testing_group_${group_num}/features/remote > cucumber_${group_num}.sh
+                                    
+                                    chmod +x cucumber_${group_num}.sh
+                                    cucumber_${group_num}.sh
+                                    
+                                    break
+
+                                fi
+                            done
+                        }
+
+
+                        if [ ${QE_Testing} == 'true' ]
+                        then
+                            cwd=$(pwd)
+                            collect_pods_info
+                            write_tags
+                            run_import_sql_to_db
+                            run_migration_and_disable_sending_qpid_msg
+                            cd $cwd
+                            prepare_umb_for_first_group
+                            write_test_scripts_and_do_testing
+                        fi                 
+                        '''
+                    } //project
+                } //cluster
+            } //script
+        } //container
+    } //stage
+} //stages
+def prepare_runner() {
+    stage('prepare runner with gems'){
+        container("qe-testing-runner") {
+            script{
+                openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                    openshift.withProject('errata-qe-test'){
+                        sh '''
+                        prepare_dir(){
+                          mkdir ${1}
+                          cd ${1} && clone_files
+                          cd -
+                        }
+                        clone_files(){
+                          wget https://code.engineering.redhat.com/gerrit/changes/170351/revisions/8aac6cca887c01b77ad530b7d40b2f321939b15c/archive?format=tgz --no-check-certificate
+                          tar -xvf 'archive?format=tgz'
+                        }
+                        echo "---> Preparing source code for cucumber cases of different groups..."
+                        for dir_num in {1..4}
+                        do
+                          prepare_dir TS2_testing_group_${dir_num}
+                        done
+                        echo "---> Install the gems for cucumber cases ..."
+                        cd TS2_testing_group_4
+                        export RAILS_ENV=test
+                        bundle install --path=/opt/rh/rh-ruby22/root/usr/local/bin 
+                        '''
+                    } //project
+                } //cluster
+            } //script
+        } //container
+    } //stage
+} //prepare_runner()
+pipeline {
+    agent { label 'qe-testing-runners'}
+    parameters {
+      string(name: 'QE_Testing', defaultValue: 'true', description: 'Do QE Testing')
+    }
+    stages {
+        stage('preamble') {
+            steps {
+                container('qe-testing-runner') {
+                script {
+                        openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                            openshift.withProject('errata-qe-test'){
+                            echo "Using project: ${openshift.project()}"
+                            sh '''
+                            oc version
+                            '''
+                        } //project
+                      } //cluster
+                   } //script
+                   } //container
+            } //steps
+        } //stage
+        stage('cleanup') {
+            steps {
+                container('qe-testing-runner') {
+                script {
+                        openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                            openshift.withProject('errata-qe-test'){
+         
+                            echo "--- Delete apps --->"
+                            def etAppNames = ["cucumber-et-1", "cucumber-et-2", "cucumber-et-3"]
+                            def mysqlAppNames = ["cucumber-et-1-mysql", "cucumber-et-2-mysql", "cucumber-et-3-mysql"] 
+                            etAppNames.each { app ->
+                                openshift.selector("all", [ app : "$app" ]).delete()
+                            }
+                            mysqlAppNames.each { app ->
+                                openshift.selector("all", [ app : "$app" ]).delete()
+                            }
+
+                            def exist1 = openshift.selector("template", "$templateNameofET").exists()
+                            if (exist1) {
+                                echo "--- Delete ET template --->"
+                                openshift.selector("template", "$templateNameofET").delete()
+                            } //if
+                            
+                            def exist2 = openshift.selector("template", "$templateNameofMysql").exists()
+                            if (exist2) {
+                                echo "--- Delete Mysql template --->"
+                                openshift.selector("template", "$templateNameofMysql").delete()
+                            }
+
+                        } //project
+                    } //cluster
+                } //script
+                } //container
+            } //steps
+        } //stage
+        stage('create templates') {
+            steps {
+                container('qe-testing-runner') {
+                script {
+                        openshift.withCluster('https://paas.psi.redhat.com', 'rA1EA9Cv_jTLE6wtYQBI60OQ10RHOgE5A0eT125vSic') {
+                            openshift.withProject('errata-qe-test'){
+                            echo '--- Upload ET template --->'
+                            openshift.create(templatePathofET)
+                            echo '--- Upload Mysql template --->'
+                            openshift.create(templatePathofMysql)
+                        } //project
+                    } //cluster
+                } //script
+                } //container
+
+            } //steps
+        } // stage
+
+
+        stage('create apps and do TS2 testing'){
+            parallel {
+                stage('create first group app and do testing') {
+                    steps {
+                        script{
+                            all_stages(templateNameofMysql, templatePathofET, etTemplateParameters, "cucumber-et-1")
+                        }
+                    }
+                }
+                stage('create second group app and do testing') {
+                    steps {
+                        script{
+                            echo "second"
+                            all_stages(templateNameofMysql, templatePathofET, etTemplateParameters, "cucumber-et-2")
+                        }
+                    }
+                }
+                stage('create third group app and do testing'){
+                    steps {
+                        script{
+                            echo "third"
+                            all_stages(templateNameofMysql, templatePathofET, etTemplateParameters, "cucumber-et-3",)
+                        }
+                    }
+                }
+                stage('prepare the testing runner for cucumber cases'){
+                    steps {
+                        script{
+                            echo "fourth"
+                            prepare_runner()
+                        }
+                    }
+                }
+            } //parallel
+            
+        }// stage
+    } //stages 
+    post {
+        always {
+         archiveArtifacts '**/cucumber-report.json'
+         cucumber fileIncludePattern: "**/cucumber-report*.json", sortingMethod: "ALPHABETICAL"
+        }
+    }             
+}
