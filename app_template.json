@@ -229,7 +229,7 @@
 							{
 								"name": "mnt-brew",
 								"persistentVolumeClaim": {
-									"claimName": "pvc-errata-qe-test-mnt-redhat"
+									"claimName": "${BREW_PVC}"
 								}
 							},
 							{
@@ -394,6 +394,10 @@
 		{
 			"name": "CLOUD_NAME",
 			"value": "cloud.paas.psi.redhat.com"
+		},
+		{
+		    "name": "BREW_PVC",
+		    "value": "pvc-errata-qe-test-mnt-redhat"
 		}
 	]
 }
