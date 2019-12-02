@@ -107,7 +107,7 @@
 							},
 							{
 								"name": "ET_DB_HOST",
-								"value": "${APP_NAME}-mysql"
+								"value": "${APP_NAME}-mariadb-102-rhel7"
 							},
 							{
 								"name": "ET_DB_PORT",
