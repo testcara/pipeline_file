@@ -19,9 +19,9 @@
 					{
 						"from": {
 							"kind": "DockerImage",
-							"name": "${ET_S2I_IMAGE}"
+							"name": "${ET_S2I_IMAGE}:${ET_S2I_IMAGE_BRANCH}"
 						},
-						"name": "${ET_S2I_IMAGE_BRANCH}"
+						"name": "latest"
 					}
 				]
 			}
