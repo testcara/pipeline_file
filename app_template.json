@@ -21,7 +21,7 @@
 							"kind": "DockerImage",
 							"name": "${ET_S2I_IMAGE}"
 						},
-						"name": "latest"
+						"name": "${ET_S2I_IMAGE_BRANCH}"
 					}
 				]
 			}
@@ -389,7 +389,11 @@
 		},
 		{
 			"name": "ET_S2I_IMAGE",
-			"value": "docker-registry.upshift.redhat.com/errata-qe-test/errata-s2i-httpd:latest"
+			"value": "docker-registry.upshift.redhat.com/errata-qe-test/errata-s2i-httpd"
+		},
+		{
+			"name": "ET_S2I_IMAGE_BRANCH",
+			"value": "latest"
 		},
 		{
 			"name": "CLOUD_NAME",
