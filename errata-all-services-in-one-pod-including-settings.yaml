@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: Template
+metadata: {name: errata-rails-aio-template}
+objects:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}-s2i
+  spec:
+    tags:
+    - from: {kind: DockerImage, name: '${ET_S2I_IMAGE}'}
+      name: latest
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}-basic
+  spec:
+    tags:
+    - from: {kind: DockerImage, name: '${NAMESPACE}/${APP_NAME}-s2i:latest'}
+      name: latest
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}-bc
+  spec:
+    output:
+      to: {kind: ImageStreamTag, name: '${APP_NAME}-basic:latest'}
+    runPolicy: Serial
+    source:
+      git: {ref: '${GIT_BRANCH}', uri: '${GIT_URL}'}
+      type: Git
+    strategy:
+      sourceStrategy:
+        env:
+        - {name: RACK_ENV, value: '${RACK_ENV}'}
+        - name: ET_DB_NAME
+          valueFrom:
+            secretKeyRef: {key: database-name, name: '${ET_MYSQL_SECRET}'}
+        - name: ET_DB_USER
+          valueFrom:
+            secretKeyRef: {key: database-user, name: '${ET_MYSQL_SECRET}'}
+        - name: ET_DB_PASSWORD
+          valueFrom:
+            secretKeyRef: {key: database-password, name: '${ET_MYSQL_SECRET}'}
+        - {name: ET_DB_HOST, value: '${APP_NAME}-mysql'}
+        - {name: ET_DB_PORT, value: '${ET_DB_PORT}'}
+        - {name: GIT_SSL_NO_VERIFY, value: '${GIT_SSL_NO_VERIFY}'}
+        - {name: RAILS_ENV, value: '${RAILS_ENV}'}
+        - {name: ALL_IN_ONE, value: '${ALL_IN_ONE}'}
+        - {name: AUTH_TYPE, value: '${AUTH_TYPE}'}
+        - {name: QE_TESTING, value: '${QE_TESTING}'}
+        forcePull: true
+        from: {kind: ImageStreamTag, name: '${APP_NAME}-s2i:latest'}
+      type: Source
+    triggers:
+    - generic: {secret: 0c71917bd034e7bd}
+      type: Generic
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}-rails
+  spec:
+    replicas: 1
+    selector: {deploymentconfig: '${APP_NAME}'}
+    strategy: {type: Rolling}
+    template:
+      metadata:
+        labels: {deploymentconfig: '${APP_NAME}'}
+      spec:
+        containers:
+        - envFrom:
+          - secretRef: {name: '${ET_SECRET}'}
+          - configMapRef: {name: '${ET_CONFIGMAP}'}
+          image: ${NAMESPACE}/${APP_NAME}-basic:latest
+          imagePullPolicy: Always
+          name: ${APP_NAME}-rails
+          ports:
+          - {containerPort: '${ET_WEB_PORT}', protocol: TCP}
+          resources:
+            limits: {cpu: '${CPU_LIMITS}', memory: '${MEM_LIMITS}'}
+            requests: {cpu: '${CPU_REQUEST}', memory: '${MEM_REQUEST}'}
+          securityContext: {runAsUser: '${RUN_USER}'}
+          volumeMounts:
+          - {mountPath: /mnt/redhat, name: mnt-brew, readonly: 'true'}
+          - {mountPath: /opt/app-root/src/cert, name: errata-cert}
+        volumes:
+        - name: mnt-brew
+          persistentVolumeClaim: {claimName: pvc-errata-qe-test-mnt-redhat}
+        - name: errata-cert
+          persistentVolumeClaim: {claimName: errata-cert}
+    triggers:
+    - imageChangeParams:
+        automatic: false
+        containerNames: ['${APP_NAME}-rails']
+        from: {kind: ImageStreamTag, name: '${APP_NAME}-basic:latest', namespace: '${NAMESPACE}'}
+      type: ImageChange
+    - {type: ConfigChange}
+- apiVersion: v1
+  kind: Route
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}-route
+  spec:
+    host: ${APP_NAME}.${CLOUD_NAME}
+    tls: {insecureEdgeTerminationPolicy: Allow, termination: edge}
+    to: {kind: Service, name: '${APP_NAME}-svc'}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels: {app: '${APP_NAME}'}
+    name: ${APP_NAME}-svc
+  spec:
+    ports:
+    - {port: 8080, protocol: TCP, targetPort: 8080}
+    selector: {deploymentconfig: '${APP_NAME}-rails'}
+- apiVersion: v1
+  data:
+    database-name: ZXJyYXRh
+    database-password: ZXJyYXRh
+    database-root-password: YXJOZGsxMjNf
+    database-user: ZXJyYXRh
+  kind: Secret
+  metadata:
+    labels:
+        app: ${APP_NAME}
+    name: et-qe-testing-mysql
+    namespace: ${NAMESPACE}
+    type: Opaque
+- apiVersion: v1
+  data:
+    BREW_BASE_URL: https://brew-qa.usersys.redhat.com/brew
+    BREW_DOWNLOAD_PATH: http://brew-qa.usersys.redhat.com/brewroot
+    BREW_XMLRPC_URL: http://brew-qa.usersys.redhat.com/kojihub
+    ET_PUB_SERVER: pub-e2e.usersys.redhat.com
+    ET_RPC_BUGZILLA_SERVER: bz-e2e.usersys.redhat.com
+    ET_RPC_JBOSS_JIRA_URL: https://projects.qe.engineering.redhat.com
+    ET_RPC_PNTDEVOPS_JIRA_URL: https://projects.qe.engineering.redhat.com
+    ET_SERVICE_NAME: 0.0.0.0
+    ET_UMB_BROKER_URL_1: amqp://umb-qe:5672
+    ET_UMB_BROKER_URL_2: amqp://umb-qe:5672
+    LIGHTBLUE_CERT_FILE: /opt/app-root/src/cert/lb-non-prod.crt.pem
+    LIGHTBLUE_CERT_KEY_FILE: /opt/app-root/src/cert/lb-non-prod.key.pem
+    LIGHTBLUE_DATA_URL: https://datasvc.periwinkle.qa.redhat.com/rest/data
+    LIGHTBLUE_SSL_VERIFY_PEER: "true"
+    RACK_ENV: staging
+    RAILS_ENV: staging
+  kind: ConfigMap
+  metadata:
+    name: et-qe-testing-settings
+    namespace: ${NAMESPACE}
+- apiVersion: v1
+  data:
+    ET_PUB_PASSWORD: ZXJyYXRh
+    ET_PUB_USER: ZXJyYXRh
+    ET_RPC_BUGZILLA_PASSWORD: bTJpYl04QXphISE3UQ==
+    ET_RPC_BUGZILLA_USER: ZXJyYXRhLXhtbHJwY0ByZWRoYXQuY29t
+    ET_RPC_JBOSS_JIRA_PASSWORD: ZXJyYXRhLXFl
+    ET_RPC_JBOSS_JIRA_USER: ZXJyYXRhLXFl
+    ET_RPC_PNTDEVOPS_JIRA_PASSWORD: ZXJyYXRhLXFl
+    ET_RPC_PNTDEVOPS_JIRA_USER: ZXJyYXRhLXFl
+  kind: Secret
+  metadata:
+    name: et-qe-testing-settings
+    namespace: ${NAMESPACE}
+  type: Opaque
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: pvc-errata-qe-test-mnt-redhat
+    namespace: ${NAMESPACE}
+  spec:
+    accessModes:
+    - ReadOnlyMany
+    resources:
+      requests:
+        storage: 1Gi
+    selector:
+      matchLabels:
+        storage-nfs-export: pv-label-errata-qe-test-mnt-redhat
+    storageClassName: sc-brew-share-mnt-redhat
+    volumeName: pv-errata-qe-test-mnt-redhat
+parameters:
+- {name: APP_NAME, value: errata-rails}
+- {name: GIT_URL, value: 'https://code.engineering.redhat.com/gerrit/errata-rails'}
+- {name: ALL_IN_ONE, value: 'true'}
+- {name: AUTH_TYPE, value: basic}
+- {name: QE_TESTING, value: 'true'}
+- {name: GIT_BRANCH, value: develop}
+- {name: RACK_ENV, value: staging}
+- {name: RAILS_ENV, value: staging}
+- {name: ET_DB_PORT, value: '3306'}
+- {name: GIT_SSL_NO_VERIFY, value: 'true'}
+- {name: CPU_LIMITS, value: '2'}
+- {name: MEM_LIMITS, value: 4Gi}
+- {name: CPU_REQUEST, value: '1'}
+- {name: MEM_REQUEST, value: 2Gi}
+- {name: ET_SECRET, value: et-default-staging-settings}
+- {name: ET_CONFIGMAP, value: et-default-staging-settings}
+- {name: ET_MYSQL_SECRET, value: et-qe-testing-mysql}
+- {name: ET_WEB_PORT, value: '8080'}
+- {name: NAMESPACE, value: errata-qe-test}
+- {name: RUN_USER, value: '1002140001'}
+- {name: ET_S2I_IMAGE, value: 'docker-registry.upshift.redhat.com/errata-qe-test/errata-s2i-httpd:latest'}
+- {name: CLOUD_NAME, value: 'cloud.paas.psi.redhat.com'}
