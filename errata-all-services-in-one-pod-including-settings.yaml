@@ -9,7 +9,7 @@ objects:
     name: ${APP_NAME}-s2i
   spec:
     tags:
-    - from: {kind: DockerImage, name: '${ET_S2I_IMAGE}'}
+    - from: {kind: DockerImage, name: "${ET_S2I_IMAGE}:${ET_S2I_IMAGE_BRANCH}"}
       name: latest
 - apiVersion: v1
   kind: ImageStream
@@ -18,7 +18,7 @@ objects:
     name: ${APP_NAME}-basic
   spec:
     tags:
-    - from: {kind: DockerImage, name: '${NAMESPACE}/${APP_NAME}-s2i:latest'}
+    - from: {kind: DockerImage, name: "${NAMESPACE}/${APP_NAME}-s2i:latest"}
       name: latest
 - apiVersion: v1
   kind: BuildConfig
@@ -27,7 +27,7 @@ objects:
     name: ${APP_NAME}-bc
   spec:
     output:
-      to: {kind: ImageStreamTag, name: '${APP_NAME}-basic:latest'}
+      to: {kind: ImageStreamTag, name: "${APP_NAME}-basic:latest"}
     runPolicy: Serial
     source:
       git: {ref: '${GIT_BRANCH}', uri: '${GIT_URL}'}
@@ -203,6 +203,8 @@ parameters:
 - {name: ET_MYSQL_SECRET, value: et-qe-testing-mysql}
 - {name: ET_WEB_PORT, value: '8080'}
 - {name: NAMESPACE, value: errata-qe-test}
+- {name: ET_S2I_IMAGE, value: 'docker-registry.upshift.redhat.com/errata-qe-test/errata-s2i-httpd'}
+- {name: ET_S2I_IMAGE_BRANCH, value: 'latest'}
 - {name: RUN_USER, value: '1002140001'}
-- {name: ET_S2I_IMAGE, value: 'docker-registry.upshift.redhat.com/errata-qe-test/errata-s2i-httpd:latest'}
+- {name: BREW_PVC, value: 'pvc-errata-qe-test-mnt-redhat'}
 - {name: CLOUD_NAME, value: 'cloud.paas.psi.redhat.com'}
