@@ -183,6 +183,18 @@ objects:
         storage-nfs-export: pv-label-errata-qe-test-mnt-redhat
     storageClassName: sc-brew-share-mnt-redhat
     volumeName: pv-errata-qe-test-mnt-redhat
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: errata-cert
+    namespace: ${NAMESPACE}
+  spec:
+    accessModes:
+    - ReadWriteMany
+    resources:
+      requests:
+        storage: 1Gi
+    storageClassName: dynamic-nfs
 parameters:
 - {name: APP_NAME, value: errata-rails}
 - {name: GIT_URL, value: 'https://code.engineering.redhat.com/gerrit/errata-rails'}
