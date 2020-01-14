@@ -45,7 +45,7 @@ objects:
         - name: ET_DB_PASSWORD
           valueFrom:
             secretKeyRef: {key: database-password, name: '${ET_MYSQL_SECRET}'}
-        - {name: ET_DB_HOST, value: '${APP_NAME}-mysql'}
+        - {name: ET_DB_HOST, value: '${APP_NAME}-mariadb-102-rhel7'}
         - {name: ET_DB_PORT, value: '${ET_DB_PORT}'}
         - {name: GIT_SSL_NO_VERIFY, value: '${GIT_SSL_NO_VERIFY}'}
         - {name: RAILS_ENV, value: '${RAILS_ENV}'}
