@@ -171,18 +171,14 @@ objects:
   kind: PersistentVolumeClaim
   metadata:
     name: pvc-errata-qe-test-mnt-redhat
-    namespace: ${NAMESPACE}
+    namespace: ${NAMESPACE} 
   spec:
     accessModes:
-    - ReadOnlyMany
+    - ReadWriteMany
     resources:
       requests:
-        storage: 1Gi
-    selector:
-      matchLabels:
-        storage-nfs-export: pv-label-errata-qe-test-mnt-redhat
-    storageClassName: sc-brew-share-mnt-redhat
-    volumeName: pv-errata-qe-test-mnt-redhat
+        storage: 14Gi
+    storageClassName: dynamic-nfs
 - apiVersion: v1
   kind: PersistentVolumeClaim
   metadata:
