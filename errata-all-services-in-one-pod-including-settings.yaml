@@ -83,7 +83,6 @@ objects:
           resources:
             limits: {cpu: '${CPU_LIMITS}', memory: '${MEM_LIMITS}'}
             requests: {cpu: '${CPU_REQUEST}', memory: '${MEM_REQUEST}'}
-          securityContext: {runAsUser: '${RUN_USER}'}
           volumeMounts:
           - {mountPath: /mnt/redhat, name: mnt-brew, readonly: 'true'}
           - {mountPath: /opt/app-root/src/cert, name: errata-cert}
@@ -213,6 +212,5 @@ parameters:
 - {name: NAMESPACE, value: errata-qe-test}
 - {name: ET_S2I_IMAGE, value: 'docker-registry.upshift.redhat.com/errata-qe-test/errata-s2i-httpd'}
 - {name: ET_S2I_IMAGE_BRANCH, value: 'latest'}
-- {name: RUN_USER, value: '1002140001'}
 - {name: BREW_PVC, value: 'pvc-errata-qe-test-mnt-redhat'}
 - {name: CLOUD_NAME, value: 'cloud.paas.psi.redhat.com'}
