@@ -139,8 +139,8 @@ objects:
     ET_RPC_JBOSS_JIRA_URL: https://projects.qe.engineering.redhat.com
     ET_RPC_PNTDEVOPS_JIRA_URL: https://projects.qe.engineering.redhat.com
     ET_SERVICE_NAME: 0.0.0.0
-    ET_UMB_BROKER_URL_1: amqp://umb-qe:5672
-    ET_UMB_BROKER_URL_2: amqp://umb-qe:5672
+    ET_UMB_BROKER_URL_1: amqps://messaging-devops-broker01.web.qa.ext.phx1.redhat.com:5671
+    ET_UMB_BROKER_URL_2: amqps://messaging-devops-broker02.web.qa.ext.phx1.redhat.com:5671
     LIGHTBLUE_CERT_FILE: /opt/app-root/src/cert/lb-non-prod.crt.pem
     LIGHTBLUE_CERT_KEY_FILE: /opt/app-root/src/cert/lb-non-prod.key.pem
     LIGHTBLUE_DATA_URL: https://datasvc.periwinkle.qa.redhat.com/rest/data
