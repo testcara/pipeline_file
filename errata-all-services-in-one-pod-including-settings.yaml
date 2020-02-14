@@ -84,7 +84,7 @@ objects:
             limits: {cpu: '${CPU_LIMITS}', memory: '${MEM_LIMITS}'}
             requests: {cpu: '${CPU_REQUEST}', memory: '${MEM_REQUEST}'}
           volumeMounts:
-          - {mountPath: /mnt/redhat, name: mnt-brew, readonly: 'true'}
+          - {mountPath: /mnt/brew, name: mnt-brew, readonly: 'true'}
           - {mountPath: /opt/app-root/src/cert, name: errata-cert}
         volumes:
         - name: mnt-brew
