@@ -86,11 +86,14 @@ objects:
           volumeMounts:
           - {mountPath: /mnt/brew, name: mnt-brew, readonly: 'true'}
           - {mountPath: /opt/app-root/src/cert, name: errata-cert}
+          - {mountPath: /opt/app-root/src/config, name: volume-inventory-config, subPath: inventory_config.yml}
         volumes:
         - name: mnt-brew
           persistentVolumeClaim: {claimName: pvc-errata-qe-test-mnt-redhat}
         - name: errata-cert
           persistentVolumeClaim: {claimName: errata-cert}
+        - name: volume-inventory-config
+          configMap: {name: inventory-config}
     triggers:
     - imageChangeParams:
         automatic: false
@@ -190,6 +193,22 @@ objects:
       requests:
         storage: 1Gi
     storageClassName: dynamic-nfs
+- apiVersion: v1
+  data:
+    inventory_config.yml: "---                                                                                                                                                                                                              \nerrata_rails_env:
+      staging\nerrata_rails_root: /opt/app-root/src\nservice_name: 0.0.0.0\n\nerrata_log_level:
+      warn\nerrata_logger_level: warn\nerrata_mailer_delivery_method: file\nerrata_mailer_smtp_address:
+      smtp.fakehost.doesnotexist.redhat.com\nerrata_pnt_devops_jira_create_tickets:
+      True\n\ndefault_settings:\n  external_test_run_urls:\n    ccat: http://nest.test.redhat.com/mnt/qa/content_test_results/$PUB_TARGET/errata/$TRIGGER_TYPE/$ID/logs/$ERRATA_ID-results.html\n
+      \   ccat/manual: http://nest.test.redhat.com/mnt/qa/content_test_results/$PUB_TARGET/errata/$TRIGGER_TYPE/$ID/logs/$ERRATA_ID-results.html\n
+      \   covscan: http://covscan-stage.lab.eng.brq2.redhat.com/covscanhub/waiving/et_mapping/$ID/\n
+      \   rpmdiff: https://rpmdiff-web.host.qe.eng.pek2.redhat.com/run/$ID/\n  product_listings_manager_enabled:
+      True\n  brew_base_url: https://brew-qa.usersys.redhat.com/brew \n  brew_xmlrpc_url:
+      http://brew-qa.usersys.redhat.com/kojihub\n  brew_download_path: http://brew-qa.usersys.redhat.com/brewroot"
+  kind: ConfigMap
+  metadata:
+    name: inventory-config
+    namespace: ${NAMESPACE}
 parameters:
 - {name: APP_NAME, value: errata-rails}
 - {name: GIT_URL, value: 'https://code.engineering.redhat.com/gerrit/errata-rails'}
