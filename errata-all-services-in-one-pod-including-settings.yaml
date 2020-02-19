@@ -202,8 +202,7 @@ objects:
       True\n\ndefault_settings:\n  external_test_run_urls:\n    ccat: http://nest.test.redhat.com/mnt/qa/content_test_results/$PUB_TARGET/errata/$TRIGGER_TYPE/$ID/logs/$ERRATA_ID-results.html\n
       \   ccat/manual: http://nest.test.redhat.com/mnt/qa/content_test_results/$PUB_TARGET/errata/$TRIGGER_TYPE/$ID/logs/$ERRATA_ID-results.html\n
       \   covscan: http://covscan-stage.lab.eng.brq2.redhat.com/covscanhub/waiving/et_mapping/$ID/\n
-      \   rpmdiff: https://rpmdiff-web.host.qe.eng.pek2.redhat.com/run/$ID/\n  product_listings_manager_enabled:
-      True
+      \   rpmdiff: https://rpmdiff-web.host.qe.eng.pek2.redhat.com/run/$ID/\n  product_listings_manager_enabled: True"
   kind: ConfigMap
   metadata:
     name: inventory-config
