@@ -86,7 +86,7 @@ objects:
           volumeMounts:
           - {mountPath: /mnt/brew, name: mnt-brew, readonly: 'true'}
           - {mountPath: /opt/app-root/src/cert, name: errata-cert}
-          - {mountPath: /opt/app-root/src/config, name: volume-inventory-config, subPath: inventory_config.yml}
+          - {mountPath: /opt/app-root/src/config/inventory_config.yml, name: volume-inventory-config, subPath: inventory_config.yml}
         volumes:
         - name: mnt-brew
           persistentVolumeClaim: {claimName: pvc-errata-qe-test-mnt-redhat}
@@ -203,8 +203,7 @@ objects:
       \   ccat/manual: http://nest.test.redhat.com/mnt/qa/content_test_results/$PUB_TARGET/errata/$TRIGGER_TYPE/$ID/logs/$ERRATA_ID-results.html\n
       \   covscan: http://covscan-stage.lab.eng.brq2.redhat.com/covscanhub/waiving/et_mapping/$ID/\n
       \   rpmdiff: https://rpmdiff-web.host.qe.eng.pek2.redhat.com/run/$ID/\n  product_listings_manager_enabled:
-      True\n  brew_base_url: https://brew-qa.usersys.redhat.com/brew \n  brew_xmlrpc_url:
-      http://brew-qa.usersys.redhat.com/kojihub\n  brew_download_path: http://brew-qa.usersys.redhat.com/brewroot"
+      True
   kind: ConfigMap
   metadata:
     name: inventory-config
